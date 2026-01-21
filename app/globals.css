@@ -24,17 +24,18 @@ body {
 }
 
 :root {
-  /* Modern Dark Theme Palette */
-  --primary: #E45858;
-  --secondary: #2A2F45;
+  /* Purple/Pink Theme Palette */
+  --primary: #E91E8C;
+  --primary-dark: #C01976;
+  --secondary: #7C3AED;
   --accent: #FF6B9D;
   --accent-soft: #FF8FB3;
-  --background: #0A0E1A;
-  --surface: #1A1F35;
-  --surface-light: #252B42;
-  --border: #2D3348;
-  --text-primary: #E8EAF0;
-  --text-secondary: #A0A8C0;
+  --background: #0F0A1E;
+  --surface: #1A1532;
+  --surface-light: #2A2145;
+  --border: #3D2E5C;
+  --text-primary: #F3F4F6;
+  --text-secondary: #B8B9C1;
   --muted: #6B7280;
   --success: #10B981;
   --danger: #EF4444;
@@ -863,7 +864,7 @@ a {
   border-radius: 16px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: white;
-  color: var(--gray-900);
+  color: #1a1a1a;
 }
 
 .otp-input:focus {
@@ -1312,6 +1313,7 @@ a {
   min-height: 100vh;
   position: relative;
   z-index: 1;
+  padding-bottom: 80px; /* Space for status bar */
 }
 
 /* Responsive sidebar */

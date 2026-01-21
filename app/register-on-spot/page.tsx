@@ -68,9 +68,6 @@ export default function RegisterOnSpot() {
     setSuccess('');
     setLoading(true);
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-
     try {
       // Prepare data for API
       const finalCollege = registrationData.collegeNotListed 
@@ -81,21 +78,43 @@ export default function RegisterOnSpot() {
         ? registrationData.customDepartment 
         : registrationData.department;
 
-      // Mock successful registration (replace with actual API later)
-      const mockParticipantId = 'KRIYA' + Math.floor(1000 + Math.random() * 9000);
-      
-      // Update payment section with mock data
-      setPaymentData({
-        participantId: mockParticipantId,
-        email: registrationData.email,
-        name: registrationData.name,
-        fee: registrationData.accommodation === 'Yes' ? 250 : 200
+      // Call registration API
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        body: JSON.stringify({
+          name: registrationData.name,
+          email: registrationData.email,
+          college: finalCollege,
+          department: finalDepartment,
+          year: registrationData.year,
+          phone: registrationData.phone,
+          accommodation: registrationData.accommodation,
+          kit_type: 'General Only', // Default kit type for on-spot registrations
+        }),
       });
 
-      setRegistrationComplete(true);
-      setSuccess('Registration successful! Now generate payment URL.');
+      const data = await response.json();
+
+      if (data.success) {
+        // Update payment section with real data
+        setPaymentData({
+          participantId: data.participant_id,
+          email: data.email,
+          name: data.name,
+          fee: data.fee,
+        });
+
+        setRegistrationComplete(true);
+        setSuccess(`Registration successful! Participant ID: ${data.participant_id}`);
+      } else {
+        setError(data.message || 'Registration failed. Please try again.');
+      }
     } catch (err) {
-      setError('Registration failed. Please try again.');
+      setError('Network error. Please check your connection and try again.');
       console.error('Registration error:', err);
     } finally {
       setLoading(false);

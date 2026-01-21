@@ -25,6 +25,14 @@ export default function KitList() {
 
     // Fetch data on mount
     fetchKitData();
+
+    // Auto-refresh every 5 seconds for live updates
+    const interval = setInterval(() => {
+      fetchKitData();
+    }, 5000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
   }, [router]);
 
   const fetchKitData = async () => {

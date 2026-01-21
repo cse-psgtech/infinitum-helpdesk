@@ -1,61 +1,72 @@
 # Infinitum Helpdesk
 
-Event helpdesk system for Infinitum - Kriya 2025. Manage on-spot registrations, kit distribution, and tracking.
+Event helpdesk system for Infinitum 2026. Manage on-spot registrations, kit distribution with mobile QR scanning, and real-time tracking for multiple organizers.
 
-## Features
+## ✨ Features
 
-- **Staff Authentication**: Secure login for helpdesk staff
-- **On-Spot Registration**: Register walk-in participants with form validation
-- **Payment URL Generation**: Generate payment links with QR codes
-- **Kit Distribution**: Verify payment and distribute event kits
-- **Kit Tracking**: Real-time statistics and participant lists
-- **Responsive Design**: Works on desktop and mobile devices
+- **🔐 Staff Authentication**: Secure login for multiple organizers
+- **📝 On-Spot Registration**: Register walk-in participants with form validation
+- **📱 Mobile QR Scanner**: Connect phone to laptop for seamless QR code scanning
+- **📦 Kit Distribution**: Verify payment and distribute event kits with real-time tracking
+- **📊 Live Statistics**: Real-time kit distribution stats with auto-refresh
+- **🔄 Session Persistence**: Scanner stays connected even when navigating pages
+- **⚠️ Connection Monitoring**: Visual indicators for phone connection status
+- **🌐 Multi-Organizer Support**: Multiple organizers can work simultaneously
+- **💾 MongoDB Integration**: All data stored in cloud database
+- **📱 Responsive Design**: Works on desktop and mobile devices
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 - **Framework**: Next.js 14 (App Router)
-- **Styling**: CSS Modules with custom CSS variables
-- **State Management**: React Hooks
-- **Authentication**: JWT token-based (localStorage)
+- **Database**: MongoDB Atlas (Cloud)
+- **Styling**: Custom CSS with theme variables
+- **QR Generation**: qrcode.react
+- **QR Scanning**: html5-qrcode
+- **State Management**: React Hooks + SessionStorage
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 infinitum-helpdesk/
 ├── app/
-│   ├── globals.css           # Global styles and theme
-│   ├── layout.js             # Root layout component
-│   ├── page.js               # Dashboard (main page)
-│   ├── login/
-│   │   └── page.js           # Login page
-│   ├── register-on-spot/
-│   │   └── page.js           # On-spot registration
-│   ├── provide-kit/
-│   │   └── page.js           # Kit distribution
-│   └── kit-list/
-│       └── page.js           # Kit tracking & statistics
+│   ├── globals.css              # Global styles and theme
+│   ├── layout.tsx               # Root layout with sidebar
+│   ├── page.tsx                 # Dashboard
+│   ├── login/page.tsx           # Staff login
+│   ├── register-on-spot/        # On-spot registration
+│   ├── provide-kit/             # Kit distribution with QR scanner
+│   ├── mobile-scanner/          # Mobile phone scanner page
+│   ├── kit-list/                # Kit tracking & statistics
+│   ├── generate-qr/             # QR code generation
+│   └── api/
+│       ├── auth/login/          # Authentication API
+│       ├── register/            # Registration API
+│       ├── participant/[id]/    # Participant details
+│       ├── scan-session/        # Scanner session management
+│       └── kits/                # Kit statistics & list
+├── components/
+│   ├── sidebar.tsx              # Navigation sidebar
+│   └── scanner-status-bar.tsx  # Global scanner status
+├── models/
+│   ├── Participant.ts           # Participant schema
+│   └── ScanSession.ts           # Scanner session schema
+├── lib/
+│   └── mongodb.ts               # MongoDB connection
 ├── data/
-│   ├── colleges.js           # List of colleges
-│   └── departments.js        # List of departments
-├── utils/
-│   └── api.js                # API utilities and helpers
-├── public/
-│   └── logo.png              # Event logo (add your logo here)
-├── package.json
-├── next.config.js
-├── jsconfig.json
-└── .env.example              # Environment variables template
+│   ├── colleges.ts              # College list
+│   └── departments.ts           # Department list
+└── .env.local                   # Environment variables
 ```
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
 - Node.js 18+ installed
 - npm or yarn package manager
-- Backend API running (see API Configuration below)
+- MongoDB Atlas account (free tier works great)
 
-### Installation
+### Local Development Setup
 
 1. **Clone the repository**
 
@@ -71,35 +82,136 @@ infinitum-helpdesk/
 
 3. **Configure environment variables**
 
+   Edit `.env.local` with your settings:
+
+   ```env
+   # MongoDB connection string (get from MongoDB Atlas)
+   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/infinitum-2026
+
+   # API URL (use localhost for development)
+   NEXT_PUBLIC_API_URL=http://localhost:3001
+
+   # Your laptop's IP address (for mobile phone to connect)
+   # Find using: ipconfig (Windows) or ifconfig (Mac/Linux)
+   NEXT_PUBLIC_HOST_IP=192.168.1.100
+   ```
+
+4. **Find your laptop's IP address** (for mobile QR scanning)
+
+   **Windows:**
    ```bash
-   cp .env.example .env.local
+   ipconfig | Select-String -Pattern "IPv4"
    ```
 
-   Edit `.env.local` and update:
-
+   **Mac/Linux:**
+   ```bash
+   ifconfig | grep "inet "
    ```
-   NEXT_PUBLIC_API_URL=http://your-backend-url
-   ```
 
-4. **Add your logo**
+   Update `NEXT_PUBLIC_HOST_IP` in `.env.local` with your IP.
+
+5. **Enable mobile Chrome to access local IP** (one-time setup)
+
+   On your phone:
+   - Open Chrome
+   - Go to `chrome://flags`
+   - Search for "Insecure origins treated as secure"
+   - Add: `http://YOUR_IP:3001` (e.g., `http://192.168.1.100:3001`)
+   - Restart Chrome
+
+6. **Add your logo** (optional)
 
    - Place your event logo as `public/logo.png`
    - Recommended size: 400x400px (transparent PNG)
 
-5. **Run development server**
+7. **Run development server**
 
    ```bash
    npm run dev
    ```
 
-6. **Open in browser**
-   ```
-   http://localhost:3000
+8. **Access the app**
+   - **On laptop:** `http://localhost:3001`
+   - **On phone:** `http://YOUR_IP:3001` (must be on same WiFi)
+
+### Default Login Credentials
+
+```
+Username: admin
+Password: infinitum2026
+
+Additional organizers:
+- organizer1 / infin123
+- organizer2 / infin123
+- organizer3 / infin123
+```
+
+## 📱 How to Use
+
+### For Multiple Organizers
+
+1. **All organizers** connect to `http://YOUR_IP:3001` (same WiFi network)
+2. Each organizer logs in with their credentials
+3. **Enable Scanner Mode** on Provide Kit page
+4. Scan the QR code with your phone camera
+5. **Scanner stays connected** even if you navigate to other pages
+6. Watch the **status bar at bottom** to see connection status:
+   - 🟢 **Green** = Phone connected, ready to scan
+   - 🟡 **Purple** = Waiting for phone connection
+   - 🔴 **Red** = Phone disconnected, scan QR again
+
+### Workflow
+
+1. **Register Participant** → Register on-spot page
+2. **Generate QR Code** → Participant gets INFIN1234 ID
+3. **Scan QR** → Use phone scanner to scan participant's QR
+4. **Provide Kit** → Verify payment, mark kit as provided
+5. **Track Stats** → View real-time statistics on Kit List page
+
+## 🌐 Production Deployment (For 1000+ Participants)
+
+For events with many participants and multiple organizers, deploy to a cloud platform:
+
+### Deploy to Vercel (Recommended - Free)
+
+1. **Install Vercel CLI**
+   ```bash
+   npm i -g vercel
    ```
 
-## API Configuration
+2. **Deploy**
+   ```bash
+   vercel
+   ```
 
-The frontend expects the following API endpoints from your backend:
+3. **Add environment variable**
+   ```bash
+   vercel env add MONGODB_URI
+   # Paste your MongoDB connection string
+   ```
+
+4. **Deploy to production**
+   ```bash
+   vercel --prod
+   ```
+
+5. **Share URL with all organizers**
+   - Everyone accesses: `https://infinitum-helpdesk.vercel.app`
+   - No IP address issues
+   - Works from anywhere with internet
+
+### Benefits of Cloud Deployment
+
+✅ No local IP configuration needed  
+✅ Accessible from anywhere  
+✅ Multiple organizers simultaneously  
+✅ Automatic HTTPS (secure)  
+✅ Fast global CDN  
+✅ Free for your use case  
+
+## 🔧 API Endpoints
+
+All API routes are built-in (no separate backend needed):
 
 ### Authentication
 
