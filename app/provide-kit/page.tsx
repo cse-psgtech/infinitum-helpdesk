@@ -392,8 +392,9 @@ export default function ProvideKit() {
   };
 
   const canProvideKit = participantData && 
-    participantData.payment_status && 
-    !participantData.kit_provided;
+    participantData.verified && 
+    participantData.generalFeePaid && 
+    !participantData.kit;
 
   return (
     <div className="page-container">

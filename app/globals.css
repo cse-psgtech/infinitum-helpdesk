@@ -881,12 +881,11 @@ a {
 }
 
 .otp-prefix {
-  font-size: 36px;
+  font-size: 60px;
   font-weight: 700;
   color: var(--gray-900);
   display: flex;
   align-items: center;
-  animation: pulse 2s ease-in-out infinite;
 }
 
 /* Participant details card */
