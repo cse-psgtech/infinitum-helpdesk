@@ -20,7 +20,6 @@ export function Sidebar() {
   }
 
   const navItems = [
-    { label: 'Register', path: '/register-on-spot' },
     { label: 'Provide Kit', path: '/provide-kit' },
     { label: 'Kit List', path: '/kit-list' },
   ];

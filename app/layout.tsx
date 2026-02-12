@@ -1,10 +1,11 @@
 import './globals.css'
 import { Metadata } from 'next'
 import { Sidebar } from '@/components/sidebar'
+import { ScannerStatusBar } from '@/components/scanner-status-bar'
 
 export const metadata: Metadata = {
   title: 'Infinitum Helpdesk - 2026',
-  description: 'Event helpdesk for Infinitum - on-spot registration, kit distribution, and tracking',
+  description: 'Event helpdesk for Infinitum - kit distribution and tracking',
 }
 
 export default function RootLayout({
@@ -22,6 +23,7 @@ export default function RootLayout({
         <div className="main-content">
           {children}
         </div>
+        <ScannerStatusBar />
       </body>
     </html>
   )

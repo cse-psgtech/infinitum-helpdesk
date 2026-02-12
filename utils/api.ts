@@ -12,8 +12,7 @@ import type {
   ParticipantListResponse,
 } from '../types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://infinitumbackend.psgtech.ac.in';
-const ADMIN_API_KEY = process.env.NEXT_PUBLIC_ADMIN_API_KEY || '';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://10.155.34.158:3001';
 
 /**
  * Generic API request handler with admin API key support

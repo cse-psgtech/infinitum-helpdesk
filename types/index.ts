@@ -22,6 +22,7 @@ export interface RegistrationData {
   year: string;
   phone: string;
   accommodation: string;
+  kit_type: 'general_workshop' | 'workshop_only' | 'general_only';
 }
 
 export interface RegistrationPayload {
@@ -32,6 +33,7 @@ export interface RegistrationPayload {
   year: number;
   phone: string;
   accommodation: string;
+  kit_type: 'general_workshop' | 'workshop_only' | 'general_only';
 }
 
 export interface RegistrationResponse {
@@ -39,6 +41,7 @@ export interface RegistrationResponse {
   name: string;
   email: string;
   fee: number;
+  qr_code: string;
 }
 
 export interface PaymentData {
@@ -56,36 +59,51 @@ export interface ParticipantDetails {
   participant_id: string;
   uniqueId: string;
   name: string;
-  email: string;
+  email?: string;
+  phone?: string;
   college: string;
-  department: string;
-  year: string;
-  phone: string;
-  profilePhoto?: string;
-  source?: string;
-  isPSGStudent?: boolean;
-  accomodation?: string;
-  verified: boolean;
-  googleId?: string;
-  generalFeePaid: boolean;
-  kit: boolean;
-  workshopFeePaid: boolean;
-  verificationUrl?: string;
-  payment_status?: boolean;
-  kit_type?: string;
-  kit_provided?: boolean;
+  department?: string;
+  year?: number;
+  payment_status: boolean;
+  kit_type: string;
+  kit_provided: boolean;
+  qr_code?: string;
 }
 
 export interface KitStatistics {
-  workshop_and_general: number;
-  workshop_only: number;
-  general_only: number;
+  success?: boolean;
+  data?: {
+    kits_provided: {
+      workshop_and_general: number;
+      workshop_only: number;
+      general_only: number;
+      total: number;
+    };
+    registered: {
+      workshop_and_general: number;
+      workshop_only: number;
+      general_only: number;
+      total: number;
+    };
+    summary: {
+      total_registered: number;
+      total_kits_provided: number;
+      pending_kits: number;
+      percentage_provided: string | number;
+    };
+  };
 }
 
 export interface ParticipantListItem {
-  participant_id: string;
+  made_id: string;
+  unique_id: string;
   name: string;
   college: string;
+  department?: string;
+  year: number;
+  kit_type?: string;
+  kit_provided?: boolean;
+  provided_at?: string | null;
 }
 
 export interface ParticipantListResponse {

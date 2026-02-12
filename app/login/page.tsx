@@ -31,22 +31,29 @@ export default function Login() {
     setError('');
     setLoading(true);
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
     try {
-      // Temporary hardcoded credentials (replace with actual API later)
-      if (formData.username === 'admin' && formData.password === 'admin') {
-        // Store auth token/session
-        localStorage.setItem('authToken', 'temp-token-' + Date.now());
-        localStorage.setItem('username', formData.username);
-        // Redirect to register on spot page
-        router.push('/register-on-spot');
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Store auth token and user info
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('username', data.username);
+        localStorage.setItem('name', data.name);
+        // Redirect to dashboard
+        router.push('/');
       } else {
-        setError('Invalid credentials. Use admin/admin to login.');
+        setError(data.message || 'Invalid credentials');
       }
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError('Login failed. Please check your connection and try again.');
       console.error('Login error:', err);
     } finally {
       setLoading(false);

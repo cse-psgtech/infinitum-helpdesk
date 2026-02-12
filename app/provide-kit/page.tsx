@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, KeyboardEvent, ChangeEvent } from 'react';
+import { useState, useEffect, useRef, KeyboardEvent, ChangeEvent, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { QRCodeSVG } from 'qrcode.react';
 import type { ParticipantDetails } from '@/types';
 
 export default function ProvideKit() {
@@ -12,9 +13,73 @@ export default function ProvideKit() {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [scannerMode, setScannerMode] = useState<boolean>(false);
+  const [sessionId, setSessionId] = useState<string>('');
+  const [scannerUrl, setScannerUrl] = useState<string>('');
   const [scannedCode, setScannedCode] = useState<string>('');
+  const [phoneConnected, setPhoneConnected] = useState<boolean>(false);
+  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
+  const [sessionDisconnected, setSessionDisconnected] = useState<boolean>(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const scannerInputRef = useRef<HTMLInputElement | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Define startPolling as useCallback so it can be called from handlers
+  const startPolling = useCallback((sessId: string) => {
+    // Clear any existing polling first
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+
+    console.log('Starting polling for session:', sessId);
+    
+    // Poll every 2 seconds
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/scan-session?session_id=${sessId}`);
+        const data = await response.json();
+
+        console.log('Polling response:', data);
+
+        if (data.success && data.status === 'scanned' && data.participant_id) {
+          console.log('Participant scanned:', data.participant_id);
+          
+          // Got a scan result!
+          const now = new Date();
+          
+          // First scan - phone just connected
+          if (!phoneConnected) {
+            setPhoneConnected(true);
+            setSessionDisconnected(false);
+            sessionStorage.setItem('phoneConnected', 'true');
+            setSuccess('📱 Phone connected! Ready to scan participants.');
+            setTimeout(() => setSuccess(''), 3000);
+          }
+          
+          // Update last scan time
+          setLastScanTime(now);
+          sessionStorage.setItem('lastScanTime', now.toISOString());
+          
+          const lastFour = data.participant_id.replace('INF', '');
+          const digits = lastFour.split('');
+          setOtpDigits(digits);
+          await fetchParticipantDetails(lastFour);
+          
+          // Reset session status for next scan (keep same session)
+          await fetch('/api/scan-session', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              session_id: sessId,
+              status: 'waiting'
+            })
+          });
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    }, 2000);
+  }, [phoneConnected]);
 
   useEffect(() => {
     // Check authentication
@@ -22,6 +87,67 @@ export default function ProvideKit() {
     if (!token) {
       router.push('/login');
     }
+
+    // Always auto-start scanner mode
+    const savedSessionId = sessionStorage.getItem('scannerSessionId');
+    const savedScannerUrl = sessionStorage.getItem('scannerUrl');
+
+    if (savedSessionId && savedScannerUrl) {
+      setSessionId(savedSessionId);
+      setScannerUrl(savedScannerUrl);
+      
+      // Restore connection status
+      const savedPhoneConnected = sessionStorage.getItem('phoneConnected');
+      const savedLastScanTime = sessionStorage.getItem('lastScanTime');
+      if (savedPhoneConnected === 'true') {
+        setPhoneConnected(true);
+      }
+      if (savedLastScanTime) {
+        setLastScanTime(new Date(savedLastScanTime));
+      }
+      
+      // Restart polling for the existing session
+      startPolling(savedSessionId);
+      startSessionCheck();
+    } else {
+      // Auto-create new scanner session on load
+      createScanSession();
+    }
+
+    // Handle tab visibility change - stop/start polling
+    const handleVisibilityChange = () => {
+      const sessId = sessionStorage.getItem('scannerSessionId');
+      if (!sessId) return;
+
+      if (document.hidden) {
+        // Tab is now hidden - stop polling to save resources
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        // Clear phone connected flag if tab is hidden (user likely left)
+        sessionStorage.setItem('phoneConnected', 'false');
+        setPhoneConnected(false);
+      } else {
+        // Tab is now visible - restart polling immediately
+        if (!pollingIntervalRef.current) {
+          startPolling(sessId);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup when page unmounts - stop polling and clear scanner state
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      stopPolling();
+      stopSessionCheck();
+      // Clear scanner state from sessionStorage
+      sessionStorage.removeItem('phoneConnected');
+      sessionStorage.removeItem('lastScanTime');
+      sessionStorage.removeItem('scannerMode');
+    };
   }, [router]);
 
   useEffect(() => {
@@ -48,17 +174,106 @@ export default function ProvideKit() {
     }
   };
 
-  const toggleScannerMode = () => {
+  const toggleScannerMode = async () => {
+    if (!scannerMode) {
+      // Enabling scanner mode - create session
+      await createScanSession();
+    } else {
+      // Disabling scanner mode - cleanup
+      stopPolling();
+      stopSessionCheck();
+      setSessionId('');
+      setScannerUrl('');
+      setPhoneConnected(false);
+      setLastScanTime(null);
+      setSessionDisconnected(false);
+      // Clear from sessionStorage
+      sessionStorage.removeItem('scannerMode');
+      sessionStorage.removeItem('scannerSessionId');
+      sessionStorage.removeItem('scannerUrl');
+      sessionStorage.removeItem('phoneConnected');
+      sessionStorage.removeItem('lastScanTime');
+    }
     setScannerMode(!scannerMode);
     setScannedCode('');
-    if (!scannerMode) {
-      // Clearing manual input when enabling scanner mode
-      setOtpDigits(['', '', '', '']);
-      setParticipantData(null);
-      setError('');
-      setSuccess('');
+    setOtpDigits(['', '', '', '']);
+    setParticipantData(null);
+    setError('');
+    setSuccess('');
+  };
+
+  const createScanSession = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/scan-session', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSessionId(data.session_id);
+        
+        // Use environment variable or auto-detect from browser
+        const hostIP = process.env.NEXT_PUBLIC_HOST_IP || '10.155.34.158';
+        const baseUrl = hostIP 
+          ? `http://${hostIP}:3001` 
+          : typeof window !== 'undefined' 
+            ? window.location.origin 
+            : 'http://10.155.34.158:3001';
+        
+        const url = `${baseUrl}/mobile-scanner?session=${data.session_id}`;
+        setScannerUrl(url);
+        
+        // Save to sessionStorage to persist across page navigation
+        sessionStorage.setItem('scannerMode', 'true');
+        sessionStorage.setItem('scannerSessionId', data.session_id);
+        sessionStorage.setItem('scannerUrl', url);
+        
+        // Start polling for scan results
+        startPolling(data.session_id);
+        startSessionCheck();
+      } else {
+        setError('Failed to create scanner session');
+      }
+    } catch (err) {
+      setError('Failed to initialize scanner');
+    } finally {
+      setLoading(false);
     }
   };
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  };
+
+  const startSessionCheck = () => {
+    // Check every 5 seconds if session is still active
+    sessionCheckIntervalRef.current = setInterval(() => {
+      if (lastScanTime && phoneConnected) {
+        const timeSinceLastScan = Date.now() - lastScanTime.getTime();
+        // If no scan in last 30 seconds, consider phone disconnected
+        if (timeSinceLastScan > 30000) {
+          setSessionDisconnected(true);
+          setPhoneConnected(false);
+          sessionStorage.setItem('phoneConnected', 'false');
+          setError('⚠️ Phone disconnected! Please scan the QR code again to reconnect.');
+        }
+      }
+    }, 5000);
+  };
+
+  const stopSessionCheck = () => {
+    if (sessionCheckIntervalRef.current) {
+      clearInterval(sessionCheckIntervalRef.current);
+      sessionCheckIntervalRef.current = null;
+    }
+  };
+
+  // Don't cleanup polling on unmount - keep session alive when navigating
+  // Polling will only stop when user clicks "Disable Scanner Mode"
 
   const handleOtpChange = (index: number, value: string) => {
     // Only allow numbers
@@ -95,10 +310,10 @@ export default function ProvideKit() {
     setParticipantData(null);
 
     try {
+      // Try to construct full participant ID (INF + 4 digits)
       const participantId = `INF${lastFourDigits}`;
       
-      // TODO: Replace with actual API endpoint
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/participant/${participantId}`, {
+      const response = await fetch(`/api/participant/${participantId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         }
@@ -106,7 +321,14 @@ export default function ProvideKit() {
 
       if (response.ok) {
         const data = await response.json();
-        setParticipantData(data);
+        // Handle response format from API
+        if (data.success && data.participant) {
+          setParticipantData(data.participant);
+        } else if (data.participant) {
+          setParticipantData(data.participant);
+        }
+      } else if (response.status === 404) {
+        setError('❌ Participant Not Found! Please verify the ID.');
       } else {
         const errorData = await response.json();
         setError(errorData.message || 'Participant not found');
@@ -176,272 +398,589 @@ export default function ProvideKit() {
 
   return (
     <div className="page-container">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: '40px' }}>
+      <div className="page-header">
         <h1>Provide Kit</h1>
-        <button 
-          className="btn btn-primary" 
-          onClick={toggleScannerMode}
-          style={{ 
-            maxWidth: '250px', 
-            fontSize: '14px',
-            padding: '12px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 7h3m14 0h3M3 12h18M3 17h3m14 0h3"/>
-            <rect x="7" y="5" width="10" height="14" rx="1"/>
-          </svg>
-          {scannerMode ? 'Disable Scanner Mode' : 'Enable Scanner Mode'}
-        </button>
       </div>
 
       <div className="page-content">
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
 
-        {/* Scanner Mode Input */}
-        {scannerMode && (
-          <section style={{ marginBottom: '32px' }}>
-            <div className="alert alert-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '16px' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 7h3m14 0h3M3 12h18M3 17h3m14 0h3"/>
-                <rect x="7" y="5" width="10" height="14" rx="1"/>
-              </svg>
-              <span><strong>Scanner Mode Active</strong> - Scan the barcode now</span>
-            </div>
-            <div style={{ textAlign: 'center', marginTop: '24px' }}>
-              <div style={{ 
-                display: 'inline-block',
-                padding: '32px 48px',
-                background: 'linear-gradient(135deg, rgba(228, 88, 88, 0.1) 0%, rgba(255, 107, 157, 0.1) 100%)',
-                borderRadius: '20px',
-                border: '3px dashed var(--primary)',
-                marginBottom: '20px'
+        <section>
+          {/* Combined Input Methods - Single Large Box */}
+          {!participantData && (
+          <div style={{
+            background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)',
+            borderRadius: '32px',
+            padding: '60px',
+            marginBottom: '48px',
+            boxShadow: '0 20px 60px rgba(102, 126, 234, 0.4)',
+            minHeight: '500px',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '60px',
+            alignItems: 'center'
+          }}>
+            {/* Left Side - Mobile Scanner QR */}
+            <div style={{
+              textAlign: 'center',
+              color: 'white'
+            }}>
+              <h3 style={{ 
+                color: 'white', 
+                marginBottom: '32px',
+                fontSize: '28px',
+                fontWeight: '700'
               }}>
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '16px' }}>
-                  <path d="M3 7h3m14 0h3M3 12h18M3 17h3m14 0h3"/>
-                  <rect x="7" y="5" width="10" height="14" rx="1"/>
-                </svg>
-                <p style={{ color: 'var(--primary)', fontSize: '18px', fontWeight: '600', margin: '0' }}>Ready to Scan</p>
+                📱 Mobile Scanner
+              </h3>
+              
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                padding: '32px',
+                borderRadius: '20px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                display: 'inline-block'
+              }}>
+                <QRCodeSVG 
+                  value={scannerUrl || 'Loading...'}
+                  size={280}
+                  level="H"
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                />
               </div>
-              <input
-                ref={scannerInputRef}
-                type="text"
-                className="form-input"
-                placeholder="Scanning... (cursor auto-focused)"
-                value={scannedCode}
-                onChange={handleScannerInput}
-                autoFocus
-                style={{ 
-                  maxWidth: '500px', 
-                  margin: '0 auto',
-                  fontSize: '18px',
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  border: '3px solid var(--primary)',
-                  backgroundColor: 'rgba(228, 88, 88, 0.05)',
-                  padding: '20px'
-                }}
-              />
-            </div>
-          </section>
-        )}
-
-        {/* ID Input Section - Show only when scanner mode is OFF */}
-        {!scannerMode && (
-          <section>
-            <h2 className="section-title">Enter Infinitum ID</h2>
-            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '24px', fontWeight: '500' }}>
-                Enter the last 4 digits of participant ID
+              <p style={{ 
+                color: 'rgba(255,255,255,0.95)', 
+                fontSize: '16px',
+                marginTop: '24px',
+                marginBottom: '16px',
+                fontWeight: '500'
+              }}>
+                Scan this QR with your phone
               </p>
-              <div className="otp-input-group">
-                <span className="otp-prefix" style={{ 
-                  fontSize: '32px',
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                padding: '16px 24px',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                textAlign: 'center',
+                backdropFilter: 'blur(10px)'
+              }}>
+                <p style={{ 
+                  color: 'white', 
+                  fontSize: '14px',
+                  margin: 0,
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}>
+                  {phoneConnected ? (
+                    <>
+                      <span style={{ fontSize: '20px' }}>●</span>
+                      <span>Phone Connected - Ready to scan</span>
+                    </>
+                  ) : sessionDisconnected ? (
+                    <>
+                      <span style={{ fontSize: '20px' }}>⚠️</span>
+                      <span>Phone Disconnected - Scan QR again</span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: '20px' }}>○</span>
+                      <span>Waiting for phone connection...</span>
+                    </>
+                  )}
+                </p>
+                {lastScanTime && phoneConnected && (
+                  <p style={{ 
+                    color: 'rgba(255,255,255,0.85)', 
+                    fontSize: '12px',
+                    margin: '8px 0 0',
+                    opacity: 0.95
+                  }}>
+                    Last scan: {lastScanTime.toLocaleTimeString()}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Right Side - Manual Entry */}
+            <div style={{
+              textAlign: 'center',
+              color: 'white',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center'
+            }}>
+              <h3 style={{ 
+                color: 'white', 
+                marginBottom: '40px',
+                fontSize: '28px',
+                fontWeight: '700'
+              }}>
+                🔑 Enter 4-digit ID
+              </h3>
+              
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '16px',
+                marginBottom: '40px'
+              }}>
+                <span style={{
+                  fontSize: '40px',
                   fontWeight: '700',
-                  color: 'var(--text-primary)',
-                  userSelect: 'none',
-                  pointerEvents: 'none',
-                  fontFamily: "'Playfair Display', serif",
-                  letterSpacing: '1px'
-                }}>INF</span>
+                  color: 'white',
+                  fontFamily: "'Playfair Display', serif"
+                }}>
+                  INF
+                </span>
                 {otpDigits.map((digit, index) => (
                   <input
                     key={index}
                     ref={el => { inputRefs.current[index] = el; }}
                     type="text"
-                    className="otp-input"
                     maxLength={1}
                     value={digit}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => handleOtpChange(index, e.target.value)}
                     onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => handleKeyDown(index, e)}
                     autoFocus={index === 0}
+                    style={{
+                      width: '70px',
+                      height: '70px',
+                      fontSize: '32px',
+                      textAlign: 'center',
+                      borderRadius: '14px',
+                      border: '2px solid rgba(255, 255, 255, 0.6)',
+                      background: 'rgba(255, 255, 255, 0.25)',
+                      color: 'white',
+                      fontWeight: '700',
+                      transition: 'all 0.3s',
+                      backdropFilter: 'blur(10px)',
+                      cursor: 'text'
+                    }}
                   />
                 ))}
               </div>
+
+              {loading && (
+                <div style={{
+                  padding: '20px',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '12px',
+                  color: 'white',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  🔍 Searching participant...
+                </div>
+              )}
             </div>
-
-            {loading && (
-              <div className="loading">
-                <div className="spinner"></div>
-                <p>Loading participant details...</p>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Loading indicator for scanner mode */}
-        {scannerMode && loading && (
-          <div className="loading">
-            <div className="spinner"></div>
-            <p>Loading participant details...</p>
           </div>
-        )}
+          )}
 
-        {/* Participant Details */}
-        {participantData && (
-          <>
-            <hr className="section-divider" />
-            <section>
-              <h2 className="section-title">Participant Details</h2>
-              
-              {participantData.kit && (
-                <div className="alert alert-warning">
-                  ⚠️ Kit already provided to this participant!
+
+          {/* Participant Details - Full Width */}
+          {participantData && (
+            <section style={{
+              marginTop: '40px',
+              animation: 'slideUp 0.3s ease-in-out'
+            }}>
+              {/* Success Message */}
+              <div style={{
+                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                color: 'white',
+                padding: '20px 28px',
+                borderRadius: '16px',
+                marginBottom: '24px',
+                textAlign: 'center',
+                fontWeight: '600',
+                fontSize: '16px',
+                boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
+              }}>
+                ✅ Participant Found Successfully!
+              </div>
+
+              {/* Details Card */}
+              <div style={{
+                background: 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FF 100%)',
+                borderRadius: '20px',
+                padding: '40px',
+                boxShadow: '0 15px 50px rgba(102, 126, 234, 0.15)',
+                marginBottom: '24px',
+                border: '1px solid rgba(102, 126, 234, 0.1)'
+              }}>
+                {/* Header with ID */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px',
+                  marginBottom: '32px',
+                  paddingBottom: '32px',
+                  borderBottom: '2px solid #E5E7EB'
+                }}>
+                  <div style={{
+                    width: '70px',
+                    height: '70px',
+                    background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: '28px',
+                    fontWeight: 'bold',
+                    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)'
+                  }}>
+                    {participantData.name?.charAt(0)?.toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 style={{
+                      fontSize: '24px',
+                      fontWeight: '700',
+                      color: '#1F2937',
+                      margin: 0
+                    }}>
+                      {participantData.name}
+                    </h3>
+                    <p style={{
+                      background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)',
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      fontWeight: '600',
+                      margin: '6px 0 0 0',
+                      fontSize: '14px'
+                    }}>
+                      ID: {participantData.participant_id}
+                    </p>
+                  </div>
                 </div>
-              )}
 
-              {!participantData.verified && (
-                <div className="alert alert-error">
-                  ❌ User not verified. Cannot provide kit until verification is complete.
+                {/* Details Grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '24px',
+                  marginBottom: '28px'
+                }}>
+                  {/* Left Column */}
+                  <div>
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        color: '#9CA3AF',
+                        marginBottom: '8px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.8px'
+                      }}>
+                        College
+                      </label>
+                      <p style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#1F2937',
+                        margin: 0
+                      }}>
+                        {participantData.college}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: '#6B7280',
+                        marginBottom: '6px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        Department
+                      </label>
+                      <p style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#1F2937',
+                        margin: 0
+                      }}>
+                        {participantData.department || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right Column */}
+                  <div>
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: '#6B7280',
+                        marginBottom: '6px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        Year
+                      </label>
+                      <p style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#1F2937',
+                        margin: 0
+                      }}>
+                        {participantData.year || 'N/A'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: '#6B7280',
+                        marginBottom: '6px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        Email
+                      </label>
+                      <p style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#1F2937',
+                        margin: 0,
+                        wordBreak: 'break-all'
+                      }}>
+                        {participantData.email || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              )}
 
-              {!participantData.generalFeePaid && (
-                <div className="alert alert-error">
-                  ❌ Payment not completed. Cannot provide kit.
+                {/* Status Badges */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '20px',
+                  marginBottom: '28px',
+                  paddingBottom: '28px',
+                  borderBottom: '2px solid #E5E7EB'
+                }}>
+                  {/* Payment Status */}
+                  <div style={{
+                    padding: '20px',
+                    borderRadius: '16px',
+                    background: participantData.payment_status 
+                      ? 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)'
+                      : 'linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)',
+                    border: `2px solid ${participantData.payment_status ? '#10B981' : '#F87171'}`,
+                    boxShadow: `0 4px 12px ${participantData.payment_status ? 'rgba(16, 185, 129, 0.1)' : 'rgba(248, 113, 113, 0.1)'}`
+                  }}>
+                    <p style={{
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#6B7280',
+                      margin: '0 0 10px 0',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Payment Status
+                    </p>
+                    <p style={{
+                      fontSize: '18px',
+                      fontWeight: '700',
+                      margin: 0,
+                      color: participantData.payment_status ? '#10B981' : '#F87171'
+                    }}>
+                      {participantData.payment_status ? '✓ Paid' : '✗ Not Paid'}
+                    </p>
+                  </div>
+
+                  {/* Kit Status */}
+                  <div style={{
+                    padding: '20px',
+                    borderRadius: '16px',
+                    background: participantData.kit_provided 
+                      ? 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)'
+                      : 'linear-gradient(135deg, #FEF3C7 0%, #FCD34D 100%)',
+                    border: `2px solid ${participantData.kit_provided ? '#10B981' : '#FBBF24'}`,
+                    boxShadow: `0 4px 12px ${participantData.kit_provided ? 'rgba(16, 185, 129, 0.1)' : 'rgba(251, 191, 36, 0.1)'}`
+                  }}>
+                    <p style={{
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#6B7280',
+                      margin: '0 0 10px 0',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Kit Status
+                    </p>
+                    <p style={{
+                      fontSize: '18px',
+                      fontWeight: '700',
+                      margin: 0,
+                      color: participantData.kit_provided ? '#10B981' : '#F59E0B'
+                    }}>
+                      {participantData.kit_provided ? '✓ Provided' : '⏳ Not Provided'}
+                    </p>
+                  </div>
                 </div>
-              )}
 
-              <div className="participant-details">
-                <div className="detail-row">
-                  <span className="detail-label">Full Name:</span>
-                  <span className="detail-value">{participantData.name}</span>
+                {/* Kit Type */}
+                <div style={{
+                  padding: '20px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #F0F4FF 0%, #E0E7FF 100%)',
+                  border: '2px solid #667EEA',
+                  marginBottom: '28px',
+                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.1)'
+                }}>
+                  <p style={{
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    color: '#6B7280',
+                    margin: '0 0 10px 0',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Kit Type
+                  </p>
+                  <p style={{
+                    fontSize: '18px',
+                    fontWeight: '700',
+                    margin: 0,
+                    color: '#667EEA'
+                  }}>
+                    {participantData.kit_type}
+                  </p>
                 </div>
 
-                <div className="detail-row">
-                  <span className="detail-label">Unique ID:</span>
-                  <span className="detail-value">{participantData.uniqueId}</span>
-                </div>
-
-                <div className="detail-row">
-                  <span className="detail-label">Email:</span>
-                  <span className="detail-value">{participantData.email}</span>
-                </div>
-
-                <div className="detail-row">
-                  <span className="detail-label">Phone:</span>
-                  <span className="detail-value">{participantData.phone}</span>
-                </div>
-
-                <div className="detail-row">
-                  <span className="detail-label">College:</span>
-                  <span className="detail-value">{participantData.college}</span>
-                </div>
-
-                <div className="detail-row">
-                  <span className="detail-label">Department:</span>
-                  <span className="detail-value">{participantData.department}</span>
-                </div>
-
-                <div className="detail-row">
-                  <span className="detail-label">Year:</span>
-                  <span className="detail-value">{participantData.year}</span>
-                </div>
-
-                <div className="detail-row">
-                  <span className="detail-label">Verification Status:</span>
-                  <span className={participantData.verified ? 'status-paid' : 'status-unpaid'}>
-                    {participantData.verified ? 'Verified ✓' : 'Not Verified ✗'}
-                  </span>
-                </div>
-
-                {participantData.verificationUrl && (
-                  <div className="detail-row">
-                    <span className="detail-label">Verification Document:</span>
-                    <a 
-                      href={participantData.verificationUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="detail-value"
-                      style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}
-                    >
-                      View Document 🔗
-                    </a>
+                {/* Warnings */}
+                {participantData.kit_provided && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+                    border: '2px solid #FBBF24',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    marginBottom: '24px',
+                    color: '#92400E',
+                    fontWeight: '600',
+                    boxShadow: '0 4px 12px rgba(251, 191, 36, 0.1)'
+                  }}>
+                    ⚠️ Kit already provided to this participant
                   </div>
                 )}
 
-                <div className="detail-row">
-                  <span className="detail-label">Payment Status:</span>
-                  <span className={participantData.generalFeePaid ? 'status-paid' : 'status-unpaid'}>
-                    {participantData.generalFeePaid ? 'Paid ✓' : 'Not Paid ✗'}
-                  </span>
-                </div>
-
-                <div className="detail-row">
-                  <span className="detail-label">Workshop Fee:</span>
-                  <span className={participantData.workshopFeePaid ? 'status-paid' : 'status-unpaid'}>
-                    {participantData.workshopFeePaid ? 'Paid ✓' : 'Not Paid ✗'}
-                  </span>
-                </div>
-
-                <div className="detail-row">
-                  <span className="detail-label">Kit Status:</span>
-                  <span className={participantData.kit ? 'status-paid' : 'status-unpaid'}>
-                    {participantData.kit ? 'Already Provided ✓' : 'Not Provided'}
-                  </span>
-                </div>
+                {!participantData.payment_status && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)',
+                    border: '2px solid #F87171',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    marginBottom: '24px',
+                    color: '#991B1B',
+                    fontWeight: '600',
+                    boxShadow: '0 4px 12px rgba(248, 113, 113, 0.1)'
+                  }}>
+                    ❌ Payment not completed. Cannot provide kit.
+                  </div>
+                )}
               </div>
 
-              <div className="btn-group">
-                <button 
-                  className="btn btn-primary" 
+              {/* Action Buttons */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '20px'
+              }}>
+                <button
                   onClick={handleProvideKit}
                   disabled={!canProvideKit || loading}
+                  style={{
+                    padding: '16px 32px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    borderRadius: '16px',
+                    border: 'none',
+                    background: canProvideKit ? 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)' : '#D1D5DB',
+                    color: 'white',
+                    cursor: canProvideKit ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.3s',
+                    boxShadow: canProvideKit ? '0 8px 20px rgba(102, 126, 234, 0.4)' : 'none'
+                  }}
                 >
-                  {loading ? 'Processing...' : 'Provide Kit'}
+                  {loading ? '⏳ Processing...' : '✓ Provide Kit'}
                 </button>
-                <button 
-                  className="btn btn-secondary" 
+                <button
                   onClick={handleReset}
+                  style={{
+                    padding: '16px 32px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    borderRadius: '16px',
+                    border: '2px solid #E5E7EB',
+                    background: 'white',
+                    color: '#1F2937',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s'
+                  }}
                 >
                   Reset
                 </button>
               </div>
             </section>
-          </>
-        )}
+          )}
+        </section>
 
-        {/* No Data Message */}
-        {!loading && !participantData && otpDigits.every(d => d !== '') && (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-gray)' }}>
-            <h3>No Data Available!</h3>
-            <p>Please check the ID and try again.</p>
-          </div>
-        )}
-
-        <div style={{ marginTop: '24px', textAlign: 'center' }}>
-          <button 
-            className="btn btn-secondary" 
+        <div style={{ marginTop: '40px', textAlign: 'center' }}>
+          <button
             onClick={() => router.push('/')}
-            style={{ maxWidth: '200px' }}
+            style={{
+              padding: '12px 32px',
+              fontSize: '14px',
+              fontWeight: '600',
+              borderRadius: '12px',
+              border: '2px solid #E5E7EB',
+              background: 'white',
+              color: '#1F2937',
+              cursor: 'pointer',
+              transition: 'all 0.3s'
+            }}
           >
-            Back to Dashboard
+            ← Back to Dashboard
           </button>
         </div>
+
+        <style>{`
+          @keyframes slideUp {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.5;
+            }
+          }
+        `}</style>
       </div>
     </div>
   );

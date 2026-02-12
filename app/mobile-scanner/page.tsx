@@ -11,6 +11,7 @@ function MobileScannerContent() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [participantData, setParticipantData] = useState<any>(null);
   const [html5QrCode, setHtml5QrCode] = useState<Html5Qrcode | null>(null);
   const hasInitialized = useRef(false);
 
@@ -39,6 +40,21 @@ function MobileScannerContent() {
       setError('');
       setScanning(true);
 
+      // Request camera permission explicitly before starting scanner
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      } catch (permErr: any) {
+        if (permErr.name === 'NotAllowedError') {
+          setError('⚠️ Camera access denied. Please grant camera permission and try again.');
+        } else if (permErr.name === 'NotFoundError') {
+          setError('No camera found on this device.');
+        } else {
+          setError('Cannot access camera. Check your browser settings.');
+        }
+        setScanning(false);
+        return;
+      }
+
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const qrCode = new Html5Qrcode('mobile-qr-reader');
@@ -56,15 +72,15 @@ function MobileScannerContent() {
         async (decodedText) => {
           console.log('Scanned:', decodedText);
           
-          // Extract participant ID (last 4 digits)
-          const match = decodedText.match(/\d{4}$/);
-          if (match) {
-            const participantId = `INFIN${match[0]}`;
-            await sendToLaptop(participantId);
+          // Extract participant ID from QR code
+          const participantId = decodedText.trim();
+          
+          if (participantId) {
+            // Fetch participant details from API
+            await fetchParticipantDetails(participantId);
             // STOP camera after successful scan
             await qrCode.stop();
             setScanning(false);
-            setSuccess(`✓ Sent ${participantId}! Check your laptop.`);
           } else {
             setError('Invalid QR code format');
             setTimeout(() => setError(''), 2000);
@@ -87,6 +103,49 @@ function MobileScannerContent() {
     }
   };
 
+  const fetchParticipantDetails = async (participantId: string) => {
+    try {
+      setError('');
+      const response = await fetch(`/api/participant/${participantId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.participant) {
+        // Participant found - display details
+        setParticipantData(data.participant);
+        setSuccess(`✓ Participant Found!`);
+
+        // Send scan data to the portal's session using participant_id
+        if (sessionId) {
+          try {
+            await fetch('/api/scan-session', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                session_id: sessionId,
+                participant_id: data.participant.participant_id, // Send the full participant_id (e.g., "INF1001")
+              }),
+            });
+            console.log('Sent scan data to portal:', data.participant.participant_id);
+          } catch (err) {
+            console.error('Error sending to session:', err);
+          }
+        }
+      } else {
+        // Participant not found
+        setError('❌ Participant Not Found! Please verify the QR code.');
+        setParticipantData(null);
+      }
+    } catch (err) {
+      console.error('Error fetching participant:', err);
+      setError('Network error. Please try again.');
+      setParticipantData(null);
+    }
+  };
+
   const sendToLaptop = async (participantId: string) => {
     try {
       const response = await fetch('/api/scan-session', {
@@ -101,14 +160,14 @@ function MobileScannerContent() {
       const data = await response.json();
 
       if (data.success) {
-        setSuccess(`Scanned ${participantId}! Check your laptop.`);
+        setSuccess(`✓ Sent to laptop! Check your device.`);
       } else {
         setError(data.message || 'Failed to send scan data');
       }
     } catch (err) {
       setError('Network error. Please try again.');
     }
-  };
+  };;
 
   return (
     <div style={{
@@ -118,69 +177,142 @@ function MobileScannerContent() {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu"
     }}>
       <div style={{
-        background: 'white',
-        borderRadius: '20px',
-        padding: '32px',
-        maxWidth: '500px',
+        background: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: '28px',
+        padding: '40px 28px',
+        maxWidth: '520px',
         width: '100%',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+        boxShadow: '0 25px 70px rgba(0,0,0,0.35)',
+        backdropFilter: 'blur(10px)'
       }}>
         <h1 style={{
-          color: '#1a1a1a',
-          marginBottom: '24px',
-          fontSize: '28px',
+          color: '#1F2937',
+          marginBottom: '28px',
+          fontSize: '32px',
           textAlign: 'center',
+          fontWeight: '700',
           fontFamily: "'Playfair Display', serif"
         }}>
-          Infinitum Scanner
+          📱 Scanner
         </h1>
 
         {error && (
           <div style={{
-            background: '#FEE',
-            color: '#C00',
+            background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)',
+            color: '#991B1B',
             padding: '16px',
-            borderRadius: '12px',
+            borderRadius: '14px',
             marginBottom: '20px',
-            textAlign: 'center'
+            textAlign: 'center',
+            fontWeight: '600',
+            border: '1px solid #FCA5A5'
           }}>
             {error}
           </div>
         )}
 
-        {success && (
+        {success && participantData && (
           <div style={{
-            background: '#E7F7EF',
-            color: '#0A6',
+            background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+            color: '#065F46',
+            padding: '24px',
+            borderRadius: '16px',
+            marginBottom: '20px',
+            textAlign: 'center',
+            fontSize: '16px',
+            fontWeight: '600',
+            border: '1px solid #6EE7B7'
+          }}>
+            <div style={{ fontSize: '28px', marginBottom: '16px', fontWeight: '700' }}>✓ Participant Found!</div>
+            
+            {/* Participant Details Card */}
+            <div style={{
+              background: 'white',
+              border: '2px solid #10B981',
+              borderRadius: '14px',
+              padding: '18px',
+              marginTop: '16px',
+              textAlign: 'left',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.1)'
+            }}>
+              <div style={{ marginBottom: '14px' }}>
+                <strong style={{ color: '#1F2937' }}>Name:</strong> 
+                <span style={{ color: '#4B5563', marginLeft: '8px', fontWeight: '500' }}>{participantData.name}</span>
+              </div>
+              <div style={{ marginBottom: '14px' }}>
+                <strong style={{ color: '#1F2937' }}>Email:</strong> 
+                <span style={{ color: '#4B5563', marginLeft: '8px', wordBreak: 'break-all', fontWeight: '500' }}>{participantData.email}</span>
+              </div>
+              {participantData.phone && (
+                <div style={{ marginBottom: '14px' }}>
+                  <strong style={{ color: '#1F2937' }}>Phone:</strong> 
+                  <span style={{ color: '#4B5563', marginLeft: '8px', fontWeight: '500' }}>{participantData.phone}</span>
+                </div>
+              )}
+              {participantData.college && (
+                <div style={{ marginBottom: '14px' }}>
+                  <strong style={{ color: '#1F2937' }}>College:</strong> 
+                  <span style={{ color: '#4B5563', marginLeft: '8px', fontWeight: '500' }}>{participantData.college}</span>
+                </div>
+              )}
+              {participantData.department && (
+                <div style={{ marginBottom: '14px' }}>
+                  <strong style={{ color: '#1F2937' }}>Department:</strong> 
+                  <span style={{ color: '#4B5563', marginLeft: '8px', fontWeight: '500' }}>{participantData.department}</span>
+                </div>
+              )}
+              {participantData.uniqueId && (
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #F0F4FF 0%, #E0E7FF 100%)',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  marginTop: '14px'
+                }}>
+                  <strong style={{ color: '#667EEA' }}>Participant ID:</strong> 
+                  <span style={{ color: '#667EEA', marginLeft: '8px', fontWeight: '700', fontSize: '18px' }}>{participantData.uniqueId}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {success && !participantData && (
+          <div style={{
+            background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)',
+            color: '#991B1B',
             padding: '16px',
-            borderRadius: '12px',
+            borderRadius: '14px',
             marginBottom: '20px',
             textAlign: 'center',
             fontSize: '18px',
-            fontWeight: '600'
+            fontWeight: '600',
+            border: '1px solid #FCA5A5'
           }}>
-            ✓ {success}
+            ❌ Participant Not Found!
           </div>
         )}
 
         {scanning && !success && (
           <>
             <p style={{
-              color: '#666',
-              marginBottom: '20px',
+              color: '#4B5563',
+              marginBottom: '24px',
               textAlign: 'center',
-              fontSize: '16px'
+              fontSize: '16px',
+              fontWeight: '500'
             }}>
-              Point camera at participant's QR code
+              📷 Point camera at QR code
             </p>
             <div id="mobile-qr-reader" style={{
               border: '3px solid #667eea',
-              borderRadius: '16px',
+              borderRadius: '20px',
               overflow: 'hidden',
-              marginBottom: '20px'
+              marginBottom: '20px',
+              boxShadow: '0 8px 24px rgba(102, 126, 234, 0.25)'
             }}></div>
           </>
         )}
@@ -197,7 +329,9 @@ function MobileScannerContent() {
               borderRadius: '12px',
               fontSize: '18px',
               fontWeight: '600',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3)',
+              transition: 'all 0.3s'
             }}
           >
             Start Scanner
@@ -229,7 +363,9 @@ function MobileScannerContent() {
               borderRadius: '12px',
               fontSize: '18px',
               fontWeight: '600',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3)',
+              transition: 'all 0.3s'
             }}
           >
             Scan Another

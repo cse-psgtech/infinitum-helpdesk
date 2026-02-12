@@ -1,283 +1,149 @@
-# Infinitum Helpdesk
+Infinitum Helpdesk
 
-Event helpdesk system for Infinitum - Kriya 2025. Manage on-spot registrations, kit distribution, and tracking.
+A modern event helpdesk management system for Infinitum - handling participant registration, kit distribution, and real-time tracking.
 
-## Features
+What this does:
 
-- **Staff Authentication**: Secure login for helpdesk staff
-- **On-Spot Registration**: Register walk-in participants with form validation
-- **Payment URL Generation**: Generate payment links with QR codes
-- **Kit Distribution**: Verify payment and distribute event kits
-- **Kit Tracking**: Real-time statistics and participant lists
-- **Responsive Design**: Works on desktop and mobile devices
+* Participant Registration - Register event participants with their college, department, year, and accommodation preferences
+* Kit Distribution - Manage and track kit distribution to participants across the event
+* Real-time Scanning - Mobile-friendly interface for quick participant lookup
+* Payment Tracking - Keep track of who's paid and accommodation details
+* Statistics Dashboard - View kit distribution progress and participant information
+* Session Management - Create and manage scan sessions for different distribution points
 
-## Tech Stack
+Built with:
 
-- **Framework**: Next.js 14 (App Router)
-- **Styling**: CSS Modules with custom CSS variables
-- **State Management**: React Hooks
-- **Authentication**: JWT token-based (localStorage)
+* Frontend: Next.js 14, React 18, TypeScript, Tailwind CSS
+* Backend: Node.js with Next.js API Routes
+* Database: MongoDB with Mongoose
+* UI: Framer Motion for animations and custom React components
 
-## Project Structure
+Before you start:
 
-```
-infinitum-helpdesk/
-├── app/
-│   ├── globals.css           # Global styles and theme
-│   ├── layout.js             # Root layout component
-│   ├── page.js               # Dashboard (main page)
-│   ├── login/
-│   │   └── page.js           # Login page
-│   ├── register-on-spot/
-│   │   └── page.js           # On-spot registration
-│   ├── provide-kit/
-│   │   └── page.js           # Kit distribution
-│   └── kit-list/
-│       └── page.js           # Kit tracking & statistics
-├── data/
-│   ├── colleges.js           # List of colleges
-│   └── departments.js        # List of departments
-├── utils/
-│   └── api.js                # API utilities and helpers
-├── public/
-│   └── logo.png              # Event logo (add your logo here)
-├── package.json
-├── next.config.js
-├── jsconfig.json
-└── .env.example              # Environment variables template
-```
+You'll need these installed on your machine:
 
-## Getting Started
+* Node.js (v18 or higher) - Get it from https://nodejs.org/
+* npm (comes with Node.js)
+* MongoDB (either local or MongoDB Atlas cloud)
+* Git (for version control)
 
-### Prerequisites
+Getting Started:
 
-- Node.js 18+ installed
-- npm or yarn package manager
-- Backend API running (see API Configuration below)
-
-### Installation
-
-1. **Clone the repository**
-
-   ```bash
-   cd infinitum-helpdesk
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   npm install
-   ```
-
-3. **Configure environment variables**
-
-   ```bash
-   cp .env.example .env.local
-   ```
-
-   Edit `.env.local` and update:
-
-   ```
-   NEXT_PUBLIC_API_URL=http://your-backend-url
-   ```
-
-4. **Add your logo**
-
-   - Place your event logo as `public/logo.png`
-   - Recommended size: 400x400px (transparent PNG)
-
-5. **Run development server**
-
-   ```bash
-   npm run dev
-   ```
-
-6. **Open in browser**
-   ```
-   http://localhost:3000
-   ```
-
-## API Configuration
-
-The frontend expects the following API endpoints from your backend:
-
-### Authentication
-
-- `POST /api/login` - Staff login
-  - Request: `{ username, password }`
-  - Response: `{ token, username }`
-
-### Registration
-
-- `POST /api/register` - Register new participant
-
-  - Request: `{ name, email, college, department, year, phone, accommodation }`
-  - Response: `{ participant_id, name, email, fee }`
-
-- `POST /api/payment/generate-url` - Generate payment URL
-  - Request: `{ participant_id, email, name, fee }`
-  - Response: `{ payment_url }`
-
-### Participant Management
-
-- `GET /api/participant/:id` - Get participant details
-
-  - Response: `{ participant_id, name, college, payment_status, kit_type, kit_provided }`
-
-- `PUT /api/participant/:id/kit` - Mark kit as provided
-  - Request: `{ kit_provided: true }`
-  - Response: `{ success: true }`
-
-### Kit Tracking
-
-- `GET /api/kits/statistics` - Get kit distribution stats
-
-  - Response: `{ workshop_and_general, workshop_only, general_only }`
-
-- `GET /api/kits/list` - Get list of participants who received kits
-  - Response: `{ participants: [...] }`
-
-Update the API base URL in `utils/api.js` or use environment variables.
-
-## Pages Overview
-
-### 1. Login (`/login`)
-
-- Staff authentication with username and password
-- Password visibility toggle
-- Redirects to dashboard on success
-
-### 2. Dashboard (`/`)
-
-- Navigation cards to all features
-- QR code display area for payment URLs
-- Logout functionality
-- Welcome message
-
-### 3. Register On-Spot (`/register-on-spot`)
-
-- Participant registration form
-- College/Department dropdowns with "Other" option
-- Auto-calculates fee based on college
-- Payment URL generation
-- QR code display integration
-
-### 4. Provide Kit (`/provide-kit`)
-
-- 4-digit OTP-style ID input
-- Auto-fetch participant details
-- Payment status verification
-- Duplicate kit prevention
-- Kit distribution confirmation
-
-### 5. Kit List (`/kit-list`)
-
-- Statistics cards (Workshop, General, Combined)
-- Scrollable participants table
-- Real-time refresh functionality
-- Serial numbers and participant details
-
-## Customization
-
-### Theme Colors
-
-Edit CSS variables in `app/globals.css`:
-
-```css
-:root {
-  --primary-purple: #8b5cf6;
-  --light-purple: #e9d5ff;
-  --dark-purple: #6d28d9;
-  /* ... */
-}
-```
-
-### College/Department Lists
-
-Update arrays in:
-
-- `data/colleges.js` - Add/remove colleges
-- `data/departments.js` - Add/remove departments
-
-### Fee Calculation
-
-Modify in `utils/api.js`:
-
-```javascript
-calculateFee: (college) => {
-  const hostColleges = ["Your College Name"];
-  return hostColleges.includes(college) ? 200 : 250;
-};
-```
-
-## Building for Production
+1. Clone the project
 
 ```bash
-# Create optimized production build
-npm run build
+git clone <repository-url>
+cd infinitum-helpdesk
+```
 
-# Start production server
+2. Install packages
+
+```bash
+npm install
+```
+
+3. Set up environment variables
+
+Copy the example file:
+```bash
+cp .env.example .env.local
+```
+
+Then edit `.env.local` and add your settings:
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:3001
+MONGODB_URI=mongodb://localhost:27017/infinitum-helpdesk
+```
+
+Or if using MongoDB Atlas (cloud):
+```
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/infinitum-helpdesk
+```
+
+4. Set up your database
+
+If you're using local MongoDB, just make sure it's running:
+```bash
+mongod
+```
+
+If you prefer MongoDB Atlas (cloud):
+- Go to https://www.mongodb.com/cloud/atlas
+- Create a free account and cluster
+- Copy your connection string
+- Add it to `.env.local`
+
+Running the app:
+
+For development:
+```bash
+npm run dev
+```
+
+Then open http://localhost:3001 in your browser
+
+For production:
+```bash
+npm run build
 npm start
 ```
 
-## Deployment
+How it's organized:
 
-### Vercel (Recommended)
+* app/ - All the pages and API endpoints
+  * api/ - Backend routes (registration, kit tracking, scanning)
+  * login/ - Staff login page
+  * provide-kit/ - Where you distribute kits to participants
+  * kit-list/ - View all participants and kit status
+  * mobile-scanner/ - Mobile scanning interface
 
-1. Push code to GitHub
-2. Import project in Vercel
-3. Add environment variables
-4. Deploy
+* components/ - Reusable UI components
+* models/ - Database schemas
+* lib/ - Helper functions
+* types/ - TypeScript definitions
+* data/ - College and department lists
+* public/ - Images and static files
+* scripts/ - Utility scripts
 
-### Other Platforms
+Commands you can use:
 
-- Build with `npm run build`
-- Serve `.next` folder
-- Set `NEXT_PUBLIC_API_URL` environment variable
+* npm run dev - Start development server
+* npm run build - Build for production
+* npm start - Start production server
+* npm run lint - Check code quality
 
-## Features Checklist
+Features explained:
 
-- ✅ Staff authentication
-- ✅ On-spot registration with validation
-- ✅ Payment URL generation
-- ✅ QR code display
-- ✅ Kit distribution with verification
-- ✅ Payment status checking
-- ✅ Duplicate kit prevention
-- ✅ Kit tracking statistics
-- ✅ Participant list with filters
-- ✅ Responsive design
-- ✅ Error handling
-- ✅ Loading states
+* Participant Registration: Staff can register participants with all their details. Each gets a unique ID like INF1234.
 
-## Browser Support
+* Kit Management: View who's paid, who's received their kit, and get distribution statistics.
 
-- Chrome (latest)
-- Firefox (latest)
-- Safari (latest)
-- Edge (latest)
+* Quick Lookup: Staff can enter a participant ID and instantly see their details and provide their kit.
 
-## Notes
+* Payment Tracking: Keep track of who's paid their fees and who still needs to pay.
 
-- All API calls include authentication headers
-- Authentication token stored in localStorage
-- Form validation on both client and server side
-- Auto-focus and keyboard navigation support
-- Mobile-responsive design with touch support
+* Authentication: Only registered staff can access the system via login.
 
-## Support
+Troubleshooting:
 
-For issues or questions:
+* Can't connect to MongoDB?
+  * Make sure MongoDB is running on your machine
+  * Check your MONGODB_URI in .env.local
+  * If using Atlas, verify your connection string is correct
 
-1. Check API endpoint configuration
-2. Verify backend is running
-3. Check browser console for errors
-4. Ensure all dependencies are installed
+* Port 3001 is already in use?
+  * Either close the other app using that port
+  * Or run: PORT=3002 npm run dev
 
-## License
+* Getting dependency errors?
+  * Try clearing everything and reinstalling:
+```bash
+rm -r node_modules
+npm install
+```
 
-Copyright © 2025 Kriya - PSG College of Technology
 
----
+Need help?
 
-Built with ❤️ for Kriya 2025
+For issues or questions, create an issue in the repository or contact the development team.
