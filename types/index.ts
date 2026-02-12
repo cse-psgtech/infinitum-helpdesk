@@ -54,11 +54,26 @@ export interface PaymentUrlResponse {
 
 export interface ParticipantDetails {
   participant_id: string;
+  uniqueId: string;
   name: string;
+  email: string;
   college: string;
-  payment_status: boolean;
-  kit_type: string;
-  kit_provided: boolean;
+  department: string;
+  year: string;
+  phone: string;
+  profilePhoto?: string;
+  source?: string;
+  isPSGStudent?: boolean;
+  accomodation?: string;
+  verified: boolean;
+  googleId?: string;
+  generalFeePaid: boolean;
+  kit: boolean;
+  workshopFeePaid: boolean;
+  verificationUrl?: string;
+  payment_status?: boolean;
+  kit_type?: string;
+  kit_provided?: boolean;
 }
 
 export interface KitStatistics {

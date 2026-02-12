@@ -95,10 +95,10 @@ export default function ProvideKit() {
     setParticipantData(null);
 
     try {
-      const participantId = `INFIN${lastFourDigits}`;
+      const participantId = `INF${lastFourDigits}`;
       
       // TODO: Replace with actual API endpoint
-      const response = await fetch(`/api/participant/${participantId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/participant/${participantId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         }
@@ -170,8 +170,9 @@ export default function ProvideKit() {
   };
 
   const canProvideKit = participantData && 
-    participantData.payment_status && 
-    !participantData.kit_provided;
+    participantData.verified && 
+    participantData.generalFeePaid && 
+    !participantData.kit;
 
   return (
     <div className="page-container">
@@ -266,11 +267,11 @@ export default function ProvideKit() {
                   pointerEvents: 'none',
                   fontFamily: "'Playfair Display', serif",
                   letterSpacing: '1px'
-                }}>Infinitum</span>
+                }}>INF</span>
                 {otpDigits.map((digit, index) => (
                   <input
                     key={index}
-                    ref={el => inputRefs.current[index] = el}
+                    ref={el => { inputRefs.current[index] = el; }}
                     type="text"
                     className="otp-input"
                     maxLength={1}
@@ -307,13 +308,19 @@ export default function ProvideKit() {
             <section>
               <h2 className="section-title">Participant Details</h2>
               
-              {participantData.kit_provided && (
+              {participantData.kit && (
                 <div className="alert alert-warning">
                   ⚠️ Kit already provided to this participant!
                 </div>
               )}
 
-              {!participantData.payment_status && (
+              {!participantData.verified && (
+                <div className="alert alert-error">
+                  ❌ User not verified. Cannot provide kit until verification is complete.
+                </div>
+              )}
+
+              {!participantData.generalFeePaid && (
                 <div className="alert alert-error">
                   ❌ Payment not completed. Cannot provide kit.
                 </div>
@@ -326,8 +333,18 @@ export default function ProvideKit() {
                 </div>
 
                 <div className="detail-row">
-                  <span className="detail-label">Participant ID:</span>
-                  <span className="detail-value">{participantData.participant_id}</span>
+                  <span className="detail-label">Unique ID:</span>
+                  <span className="detail-value">{participantData.uniqueId}</span>
+                </div>
+
+                <div className="detail-row">
+                  <span className="detail-label">Email:</span>
+                  <span className="detail-value">{participantData.email}</span>
+                </div>
+
+                <div className="detail-row">
+                  <span className="detail-label">Phone:</span>
+                  <span className="detail-value">{participantData.phone}</span>
                 </div>
 
                 <div className="detail-row">
@@ -336,21 +353,55 @@ export default function ProvideKit() {
                 </div>
 
                 <div className="detail-row">
+                  <span className="detail-label">Department:</span>
+                  <span className="detail-value">{participantData.department}</span>
+                </div>
+
+                <div className="detail-row">
+                  <span className="detail-label">Year:</span>
+                  <span className="detail-value">{participantData.year}</span>
+                </div>
+
+                <div className="detail-row">
+                  <span className="detail-label">Verification Status:</span>
+                  <span className={participantData.verified ? 'status-paid' : 'status-unpaid'}>
+                    {participantData.verified ? 'Verified ✓' : 'Not Verified ✗'}
+                  </span>
+                </div>
+
+                {participantData.verificationUrl && (
+                  <div className="detail-row">
+                    <span className="detail-label">Verification Document:</span>
+                    <a 
+                      href={participantData.verificationUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="detail-value"
+                      style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}
+                    >
+                      View Document 🔗
+                    </a>
+                  </div>
+                )}
+
+                <div className="detail-row">
                   <span className="detail-label">Payment Status:</span>
-                  <span className={participantData.payment_status ? 'status-paid' : 'status-unpaid'}>
-                    {participantData.payment_status ? 'Paid ✓' : 'Not Paid ✗'}
+                  <span className={participantData.generalFeePaid ? 'status-paid' : 'status-unpaid'}>
+                    {participantData.generalFeePaid ? 'Paid ✓' : 'Not Paid ✗'}
                   </span>
                 </div>
 
                 <div className="detail-row">
-                  <span className="detail-label">Kit Type:</span>
-                  <span className="detail-value">{participantData.kit_type || 'General'}</span>
+                  <span className="detail-label">Workshop Fee:</span>
+                  <span className={participantData.workshopFeePaid ? 'status-paid' : 'status-unpaid'}>
+                    {participantData.workshopFeePaid ? 'Paid ✓' : 'Not Paid ✗'}
+                  </span>
                 </div>
 
                 <div className="detail-row">
                   <span className="detail-label">Kit Status:</span>
-                  <span className={participantData.kit_provided ? 'status-paid' : 'status-unpaid'}>
-                    {participantData.kit_provided ? 'Already Provided ✓' : 'Not Provided'}
+                  <span className={participantData.kit ? 'status-paid' : 'status-unpaid'}>
+                    {participantData.kit ? 'Already Provided ✓' : 'Not Provided'}
                   </span>
                 </div>
               </div>

@@ -12,24 +12,37 @@ import type {
   ParticipantListResponse,
 } from '../types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://infinitumbackend.psgtech.ac.in';
+const ADMIN_API_KEY = process.env.NEXT_PUBLIC_ADMIN_API_KEY || '';
 
 /**
- * Generic API request handler
+ * Generic API request handler with admin API key support
  */
 export async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  useAdminKey: boolean = true
 ): Promise<APIResponse<T>> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
   
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...((options.headers as Record<string, string>) || {}),
+  };
+
+  // Add admin API key if required
+  if (useAdminKey && ADMIN_API_KEY) {
+    headers['x-api-key'] = ADMIN_API_KEY;
+  }
+
+  // Add authorization token if available
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const config: RequestInit = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
-      ...options.headers,
-    },
     ...options,
+    headers,
   };
 
   try {
@@ -89,15 +102,52 @@ export const registrationAPI = {
  * Participant API
  */
 export const participantAPI = {
-  getById: async (participantId: string): Promise<APIResponse<ParticipantDetails>> => {
-    return apiRequest<ParticipantDetails>(`/api/participant/${participantId}`);
+  // Get user details by uniqueId (for helpdesk)
+  getById: async (uniqueId: string): Promise<APIResponse<ParticipantDetails>> => {
+    const result = await apiRequest<{ user: ParticipantDetails[] }>(
+      `/api/auth/admin/user/${uniqueId}`,
+      { method: 'GET' },
+      true
+    );
+    
+    // Transform response - backend returns array, we return first item
+    if (result.success && result.data?.user && result.data.user.length > 0) {
+      return { 
+        success: true, 
+        data: {
+          ...result.data.user[0],
+          participant_id: result.data.user[0].uniqueId,
+          payment_status: result.data.user[0].generalFeePaid,
+          kit_provided: result.data.user[0].kit,
+        }
+      };
+    }
+    
+    return { success: false, error: 'User not found' };
   },
   
-  markKitProvided: async (participantId: string): Promise<APIResponse<{ success: boolean }>> => {
-    return apiRequest<{ success: boolean }>(`/api/participant/${participantId}/kit`, {
-      method: 'PUT',
-      body: JSON.stringify({ kit_provided: true }),
-    });
+  // Update kit status
+  markKitProvided: async (uniqueId: string): Promise<APIResponse<{ success: boolean; message: string }>> => {
+    return apiRequest<{ success: boolean; message: string }>(
+      `/api/auth/user/kit/true`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ uniqueId }),
+      },
+      true
+    );
+  },
+
+  // Spot register a user for an event
+  spotRegister: async (userId: string, eventId: string): Promise<APIResponse<{ message: string }>> => {
+    return apiRequest<{ message: string }>(
+      `/api/auth/admin/spot-register`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, eventId }),
+      },
+      true
+    );
   },
 };
 
