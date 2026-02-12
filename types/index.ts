@@ -68,6 +68,16 @@ export interface ParticipantDetails {
   kit_type: string;
   kit_provided: boolean;
   qr_code?: string;
+  // Backend user model fields
+  verified?: boolean;
+  generalFeePaid?: boolean;
+  kit?: boolean;
+  verificationUrl?: string;
+  profilePhoto?: string;
+  source?: string;
+  isPSGStudent?: boolean;
+  accomodation?: boolean;
+  workshopFeePaid?: boolean;
 }
 
 export interface KitStatistics {
