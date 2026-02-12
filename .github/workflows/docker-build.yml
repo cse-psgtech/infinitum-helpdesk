@@ -54,7 +54,6 @@ jobs:
             NEXT_PUBLIC_ADMIN_API_KEY=${{ secrets.NEXT_PUBLIC_ADMIN_API_KEY }}
             ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
             ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-            ADMIN_NAME=${{ secrets.ADMIN_NAME }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

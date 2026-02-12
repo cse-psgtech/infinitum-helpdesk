@@ -351,6 +351,34 @@ export default function ProvideKit() {
           )}
         </div>
 
+        {/* Placeholder when no user is selected */}
+        {!userDetails && !loading && (
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '80px 40px',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+            textAlign: 'center'
+          }}>
+            <h3 style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              color: '#1F2937',
+              marginBottom: '12px'
+            }}>
+              Kit Distribution
+            </h3>
+            <p style={{
+              fontSize: '16px',
+              color: '#6B7280',
+              maxWidth: '400px',
+              margin: '0 auto'
+            }}>
+              Enter a participant ID above to view their details and provide them with a kit
+            </p>
+          </div>
+        )}
+
         {/* User Details Section */}
         {userDetails && (
           <div style={{
