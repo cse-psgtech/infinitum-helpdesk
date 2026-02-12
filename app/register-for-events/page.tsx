@@ -54,7 +54,18 @@ export default function RegisterForEvents() {
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [registering, setRegistering] = useState<boolean>(false);
   const [registerSuccess, setRegisterSuccess] = useState<boolean>(false);
+  const [authChecking, setAuthChecking] = useState<boolean>(true);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Check authentication
+  useEffect(() => {
+    const isAuthenticated = localStorage.getItem('helpdeskauthenticated');
+    if (!isAuthenticated) {
+      router.push('/');
+    } else {
+      setAuthChecking(false);
+    }
+  }, [router]);
 
   // Fetch events and counts on mount
   useEffect(() => {
@@ -313,6 +324,22 @@ export default function RegisterForEvents() {
     }
   };
 
+  if (authChecking) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ color: 'white', fontSize: '18px', fontWeight: '600' }}>
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -326,7 +353,7 @@ export default function RegisterForEvents() {
         margin: '0 auto 20px'
       }}>
         <button
-          onClick={() => router.push('/')}
+          onClick={() => router.push('/dashboard')}
           style={{
             padding: '10px 20px',
             fontSize: '14px',

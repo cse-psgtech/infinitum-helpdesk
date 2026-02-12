@@ -23,10 +23,23 @@ export default function WorkshopCertificate() {
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
+  const [authChecking, setAuthChecking] = useState<boolean>(true);
+
+  // Check authentication
+  useEffect(() => {
+    const isAuthenticated = localStorage.getItem('helpdeskauthenticated');
+    if (!isAuthenticated) {
+      router.push('/');
+    } else {
+      setAuthChecking(false);
+    }
+  }, [router]);
 
   useEffect(() => {
-    fetchWorkshops();
-  }, []);
+    if (!authChecking) {
+      fetchWorkshops();
+    }
+  }, [authChecking]);
 
   const fetchWorkshops = async () => {
     try {
@@ -44,6 +57,22 @@ export default function WorkshopCertificate() {
     }
   };
 
+  if (authChecking) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ color: 'white', fontSize: '18px', fontWeight: '600' }}>
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -57,7 +86,7 @@ export default function WorkshopCertificate() {
         margin: '0 auto 20px'
       }}>
         <button
-          onClick={() => router.push('/')}
+          onClick={() => router.push('/dashboard')}
           style={{
             padding: '10px 20px',
             fontSize: '14px',

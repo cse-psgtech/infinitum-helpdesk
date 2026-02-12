@@ -32,7 +32,18 @@ export default function ProvideKit() {
   const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
   const [kitUpdateLoading, setKitUpdateLoading] = useState<boolean>(false);
   const [kitUpdateSuccess, setKitUpdateSuccess] = useState<boolean>(false);
+  const [authChecking, setAuthChecking] = useState<boolean>(true);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Check authentication
+  useEffect(() => {
+    const isAuthenticated = localStorage.getItem('helpdeskauthenticated');
+    if (!isAuthenticated) {
+      router.push('/');
+    } else {
+      setAuthChecking(false);
+    }
+  }, [router]);
 
   // Handle Enter key for kit provision
   useEffect(() => {
@@ -231,6 +242,22 @@ export default function ProvideKit() {
     setShowConfirmation(false);
   };
 
+  if (authChecking) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ color: 'white', fontSize: '18px', fontWeight: '600' }}>
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -244,7 +271,7 @@ export default function ProvideKit() {
         margin: '0 auto 20px'
       }}>
         <button
-          onClick={() => router.push('/')}
+          onClick={() => router.push('/dashboard')}
           style={{
             padding: '10px 20px',
             fontSize: '14px',
@@ -366,7 +393,7 @@ export default function ProvideKit() {
               color: '#1F2937',
               marginBottom: '12px'
             }}>
-              Kit Distribution
+              Id card Distribution
             </h3>
             <p style={{
               fontSize: '16px',
@@ -374,7 +401,7 @@ export default function ProvideKit() {
               maxWidth: '400px',
               margin: '0 auto'
             }}>
-              Enter a participant ID above to view their details and provide them with a kit
+              Enter a participant ID above to view their details and provide them with a ID card
             </p>
           </div>
         )}
@@ -544,7 +571,7 @@ export default function ProvideKit() {
                 {/* Status Badges */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 1fr',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
                   gap: '16px',
                   marginBottom: '24px'
                 }}>
@@ -588,6 +615,27 @@ export default function ProvideKit() {
                       margin: 0,
                       color: userDetails.generalFeePaid ? '#10B981' : '#EF4444'
                     }}>{userDetails.generalFeePaid ? '✓ Yes' : '✗ No'}</p>
+                  </div>
+
+                  <div style={{
+                    padding: '16px',
+                    borderRadius: '12px',
+                    background: userDetails.workshopFeePaid ? '#ECFDF5' : '#FEF2F2',
+                    border: `2px solid ${userDetails.workshopFeePaid ? '#10B981' : '#EF4444'}`
+                  }}>
+                    <p style={{
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      color: '#9CA3AF',
+                      margin: '0 0 8px 0',
+                      textTransform: 'uppercase'
+                    }}>Workshop Fee</p>
+                    <p style={{
+                      fontSize: '16px',
+                      fontWeight: '700',
+                      margin: 0,
+                      color: userDetails.workshopFeePaid ? '#10B981' : '#EF4444'
+                    }}>{userDetails.workshopFeePaid ? '✓ Yes' : '✗ No'}</p>
                   </div>
 
                   <div style={{
@@ -643,7 +691,7 @@ export default function ProvideKit() {
                       }
                     }}
                   >
-                    {kitUpdateLoading ? '⏳ Updating...' : '📦 Kit Provided'}
+                    {kitUpdateLoading ? '⏳ Updating...' : '📦 Id Provided'}
                   </button>
                 )}
 
@@ -752,7 +800,7 @@ export default function ProvideKit() {
               color: '#6B7280',
               marginBottom: '8px',
               textAlign: 'center'
-            }}>Are you sure you want to mark kit as provided for:</p>
+            }}>Are you sure you want to mark Id as provided for:</p>
             
             <p style={{
               fontSize: '20px',

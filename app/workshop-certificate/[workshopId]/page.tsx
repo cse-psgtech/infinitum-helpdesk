@@ -23,12 +23,23 @@ export default function WorkshopParticipants() {
   const [error, setError] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [updatingCertificate, setUpdatingCertificate] = useState<string | null>(null);
+  const [authChecking, setAuthChecking] = useState<boolean>(true);
+
+  // Check authentication
+  useEffect(() => {
+    const isAuthenticated = localStorage.getItem('helpdeskauthenticated');
+    if (!isAuthenticated) {
+      router.push('/');
+    } else {
+      setAuthChecking(false);
+    }
+  }, [router]);
 
   useEffect(() => {
-    if (workshopId) {
+    if (workshopId && !authChecking) {
       fetchParticipants();
     }
-  }, [workshopId]);
+  }, [workshopId, authChecking]);
 
   useEffect(() => {
     // Filter participants based on search query
@@ -135,6 +146,22 @@ export default function WorkshopParticipants() {
       setUpdatingCertificate(null);
     }
   };
+
+  if (authChecking) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ color: 'white', fontSize: '18px', fontWeight: '600' }}>
+          Loading...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
