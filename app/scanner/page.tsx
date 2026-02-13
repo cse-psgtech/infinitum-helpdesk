@@ -37,7 +37,8 @@ function ScannerContent() {
 
     const socket = io(socketUrl, {
       path: '/socket.io',
-      transports: ['websocket', 'polling']
+      // Use polling for production behind reverse proxy
+      transports: process.env.NODE_ENV === 'production' ? ['polling', 'websocket'] : ['websocket', 'polling']
     });
     
     socketRef.current = socket;
