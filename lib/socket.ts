@@ -57,6 +57,8 @@ export const initializeSocket = (httpServer: HTTPServer) => {
           'http://localhost:4000',
           'http://localhost:3000',
           'http://localhost:5173',
+          'https://helpdeskinfinitum.psgtech.ac.in',
+          'http://helpdeskinfinitum.psgtech.ac.in',
           ...(process.env.NEXT_PUBLIC_APP_URL ? [process.env.NEXT_PUBLIC_APP_URL] : []),
           /^http:\/\/192\.168\.\d+\.\d+:4000$/,
           /^http:\/\/192\.168\.\d+\.\d+:3000$/,

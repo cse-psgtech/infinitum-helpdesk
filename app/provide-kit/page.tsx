@@ -889,7 +889,7 @@ export default function ProvideKit() {
                       }
                     }}
                   >
-                    {kitUpdateLoading ? '⏳ Updating...' : '📦 Id Provided'}
+                    {kitUpdateLoading ? ' Updating...' : 'Id Provided'}
                   </button>
                 )}
 
@@ -904,7 +904,7 @@ export default function ProvideKit() {
                     color: '#10B981',
                     fontSize: '16px'
                   }}>
-                    ✓ Kit status updated! Enter new ID to continue.
+                    ✓ Id card status updated! Enter new ID to continue.
                   </div>
                 )}
               </div>
@@ -991,7 +991,7 @@ export default function ProvideKit() {
               color: '#1F2937',
               marginBottom: '16px',
               textAlign: 'center'
-            }}>Confirm Kit Provision</h3>
+            }}>Confirm Id Provision</h3>
             
             <p style={{
               fontSize: '16px',

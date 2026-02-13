@@ -742,7 +742,7 @@ export default function RegisterForEvents() {
                 }
               }}
             >
-              {registering ? '⏳ Registering...' : '📝 Register for Event'}
+              {registering ? 'Registering...' : 'Register for Event'}
             </button>
 
             {registerSuccess && (
