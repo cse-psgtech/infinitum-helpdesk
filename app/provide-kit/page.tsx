@@ -350,7 +350,7 @@ export default function ProvideKit() {
         </button>
 
         {/* Scanner Toggle */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        {/* <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button
             onClick={scannerMode ? disableScannerMode : enableScannerMode}
             style={{
@@ -411,7 +411,7 @@ export default function ProvideKit() {
               Scanner Connected
             </div>
           )}
-        </div>
+        </div> */}
       </div>
 
       {/* Main Content */}
