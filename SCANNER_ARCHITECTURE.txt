@@ -1,0 +1,146 @@
+┌─────────────────────────────────────────────────────────────────┐
+│                    QR SCANNER WORKFLOW                          │
+└─────────────────────────────────────────────────────────────────┘
+
+
+┌───────────────┐                          ┌────────────────┐
+│   LAPTOP      │                          │    MOBILE      │
+│  (Helpdesk)   │                          │   (Scanner)    │
+└───────┬───────┘                          └────────┬───────┘
+        │                                           │
+        │  1. Click "Enable Scanner"                │
+        ├──────────────────────────────────────────►│
+        │     Creates desk session                  │
+        │     Generates QR code                     │
+        │                                           │
+        │                                           │
+        │  2. Mobile scans QR code                  │
+        │◄──────────────────────────────────────────┤
+        │     Opens /scanner?deskId=xxx&signature=xxx
+        │                                           │
+        │                                           │
+        │          ┌──────────────────┐            │
+        │          │   Socket.IO      │            │
+        │          │    Server        │            │
+        │          │  (port 4000)     │            │
+        │          └────────┬─────────┘            │
+        │                   │                       │
+        │  3. join-desk     │   4. join-scanner    │
+        ├──────────────────►│◄──────────────────────┤
+        │                   │                       │
+        │  5. scanner-connected                     │
+        │◄──────────────────┤                       │
+        │                   │                       │
+        │                   │   6. Camera starts    │
+        │                   │◄──────────────────────┤
+        │                   │                       │
+        │                   │   7. Scans QR code    │
+        │                   │      (INF1234)        │
+        │                   │◄──────────────────────┤
+        │                   │   scan-participant    │
+        │                   │                       │
+        │  8. scan-acknowledged                     │
+        │◄──────────────────┼──────────────────────►│
+        │     (uniqueId: INF1234)                   │
+        │                                           │
+        │  9. Auto-fills 4-digit ID                 │
+        │     Fetches user details                  │
+        │                                           │
+        │                                           │
+        │  10. Distribute kit                       │
+        │      Click "Clear"                        │
+        ├──────────────────►│                       │
+        │   clear-scan      │                       │
+        │                   ├──────────────────────►│
+        │                   │   resume-scanning     │
+        │                   ├──────────────────────►│
+        │                   │                       │
+        │                   │   11. Camera restarts │
+        │                   │      Ready for next   │
+        │                   │                       │
+        └───────────────────┴───────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════
+                        SOCKET.IO EVENTS
+═══════════════════════════════════════════════════════════════════
+
+CLIENT → SERVER:
+├─ join-desk          : Laptop joins session
+├─ join-scanner       : Mobile joins session  
+├─ scan-participant   : Mobile sends scanned ID
+├─ clear-scan         : Reset for next scan
+└─ resume-scanning    : Tell mobile to resume
+
+SERVER → CLIENT:
+├─ desk-joined        : Confirm desk connection
+├─ scanner-joined     : Confirm scanner connection
+├─ scanner-connected  : Notify desk that mobile connected
+├─ scanner-disconnected : Notify desk that mobile disconnected
+├─ desk-disconnected  : Notify mobile that laptop disconnected
+├─ scan-acknowledged  : Broadcast scanned ID
+├─ clear-scan         : Broadcast clear request
+├─ resume-scanning    : Tell mobile to resume scanning
+└─ error              : Error occurred
+
+
+═══════════════════════════════════════════════════════════════════
+                        FILE STRUCTURE
+═══════════════════════════════════════════════════════════════════
+
+infinitum-helpdesk/
+│
+├─ server.js                       ← Custom Next.js + Socket.IO server
+│
+├─ contexts/
+│  └─ ScannerContext.tsx           ← React context for scanner state
+│
+├─ app/
+│  ├─ layout.tsx                   ← Wrapped with ScannerProvider
+│  │
+│  ├─ provide-kit/
+│  │  └─ page.tsx                  ← Laptop desk interface
+│  │                                  • Scanner toggle
+│  │                                  • QR code display
+│  │                                  • Auto-populate ID
+│  │                                  • Clear button
+│  │
+│  ├─ scanner/
+│  │  └─ page.tsx                  ← Mobile scanner interface
+│  │                                  • QR code scanner
+│  │                                  • Camera controls
+│  │                                  • Status indicators
+│  │
+│  └─ api/
+│     ├─ socket/route.ts           ← Socket info endpoint
+│     └─ desk/session/route.ts     ← Create desk session
+│
+└─ Documentation/
+   ├─ QR_SCANNER_SETUP.md          ← Detailed technical docs
+   └─ SCANNER_QUICK_START.md       ← Quick start guide
+
+
+═══════════════════════════════════════════════════════════════════
+                     SECURITY FEATURES
+═══════════════════════════════════════════════════════════════════
+
+✓ Session-based authentication (deskId + signature)
+✓ 24-hour session expiration
+✓ CORS protection for socket connections
+✓ Role-based event handling (desk vs scanner)
+✓ Room isolation (each desk has its own room)
+
+
+═══════════════════════════════════════════════════════════════════
+                        WHAT'S NEW
+═══════════════════════════════════════════════════════════════════
+
+✓ Socket.IO server integrated with Next.js
+✓ Real-time bidirectional communication
+✓ Scanner context for state management
+✓ Mobile-optimized scanner page
+✓ Auto-populate ID on laptop when scanned on mobile
+✓ One-click clear and resume
+✓ Connection status indicators
+✓ Session persistence across refreshes
+✓ Fallback to manual entry still available

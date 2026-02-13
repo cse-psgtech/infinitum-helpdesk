@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { useScanner } from '@/contexts/ScannerContext';
+import { QRCodeSVG } from 'qrcode.react';
+import toast from 'react-hot-toast';
 
 interface UserDetails {
   uniqueId: string;
@@ -25,6 +28,7 @@ interface UserDetails {
 
 export default function ProvideKit() {
   const router = useRouter();
+  const { scannerMode, deskSession, scannerConnected, socket, enableScannerMode, disableScannerMode, scannedId, setScannedId } = useScanner();
   const [digits, setDigits] = useState<string[]>(['', '', '', '']);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -44,6 +48,36 @@ export default function ProvideKit() {
       setAuthChecking(false);
     }
   }, [router]);
+
+  // Listen for scanned IDs from socket
+  useEffect(() => {
+    if (scannedId.length === 4) {
+      const newDigits = scannedId.split('');
+      setDigits(newDigits);
+      fetchUserDetails(scannedId);
+    }
+  }, [scannedId]);
+
+  // Listen for clear-scan event from scanner
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleClearScan = () => {
+      setScannedId('');
+      setDigits(['', '', '', '']);
+      setUserDetails(null);
+      setError('');
+      setKitUpdateSuccess(false);
+      inputRefs.current[0]?.focus();
+      toast.success('Cleared by scanner');
+    };
+
+    socket.on('clear-scan', handleClearScan);
+
+    return () => {
+      socket.off('clear-scan', handleClearScan);
+    };
+  }, [socket, setScannedId]);
 
   // Handle Enter key for kit provision
   useEffect(() => {
@@ -242,6 +276,21 @@ export default function ProvideKit() {
     setShowConfirmation(false);
   };
 
+  const clearScan = () => {
+    setScannedId('');
+    setDigits(['', '', '', '']);
+    setUserDetails(null);
+    setError('');
+    setKitUpdateSuccess(false);
+    inputRefs.current[0]?.focus();
+
+    if (socket && scannerMode) {
+      socket.emit('clear-scan');
+      socket.emit('resume-scanning');
+      toast.success('Ready for next scan');
+    }
+  };
+
   if (authChecking) {
     return (
       <div style={{
@@ -268,7 +317,12 @@ export default function ProvideKit() {
       <div style={{
         maxWidth: '1200px',
         width: '100%',
-        margin: '0 auto 20px'
+        margin: '0 auto 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '10px',
+        flexWrap: 'wrap'
       }}>
         <button
           onClick={() => router.push('/dashboard')}
@@ -294,6 +348,70 @@ export default function ProvideKit() {
         >
           ← Back to Home
         </button>
+
+        {/* Scanner Toggle */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={scannerMode ? disableScannerMode : enableScannerMode}
+            style={{
+              padding: '10px 20px',
+              fontSize: '14px',
+              fontWeight: '600',
+              borderRadius: '10px',
+              border: 'none',
+              background: scannerMode 
+                ? 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)'
+                : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+              color: 'white',
+              cursor: 'pointer',
+              transition: 'all 0.3s',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+            }}
+          >
+            <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {scannerMode ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+              )}
+            </svg>
+            {scannerMode ? 'Disable' : 'Enable'} Scanner
+          </button>
+          
+          {scannerMode && scannerConnected && (
+            <div style={{
+              padding: '8px 16px',
+              fontSize: '12px',
+              fontWeight: '600',
+              borderRadius: '8px',
+              background: 'rgba(16, 185, 129, 0.2)',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: '#10B981',
+                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+              }}></div>
+              Scanner Connected
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
@@ -377,6 +495,86 @@ export default function ProvideKit() {
             </div>
           )}
         </div>
+
+        {/* QR Code Display - Scanner Mode */}
+        {scannerMode && deskSession && (
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '30px',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+            textAlign: 'center',
+            marginBottom: '20px'
+          }}>
+            <h3 style={{
+              fontSize: '20px',
+              fontWeight: '700',
+              color: '#1F2937',
+              marginBottom: '16px'
+            }}>
+              Scan QR Code on Mobile
+            </h3>
+            <p style={{
+              fontSize: '14px',
+              color: '#6B7280',
+              marginBottom: '20px'
+            }}>
+              Open this QR code on your mobile device to start scanning participant IDs
+            </p>
+            
+            <div style={{
+              display: 'inline-block',
+              padding: '20px',
+              background: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+            }}>
+              <QRCodeSVG
+                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/scanner?deskId=${deskSession.deskId}&signature=${deskSession.signature}`}
+                size={200}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+
+            <p style={{
+              fontSize: '12px',
+              color: '#9CA3AF',
+              marginTop: '16px'
+            }}>
+              Status: {scannerConnected ? '✓ Mobile Connected' : '⏳ Waiting for mobile...'}
+            </p>
+
+            {userDetails && (
+              <button
+                onClick={clearScan}
+                style={{
+                  marginTop: '20px',
+                  padding: '12px 24px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
+                }}
+              >
+                Clear & Ready for Next Scan
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Placeholder when no user is selected */}
         {!userDetails && !loading && (

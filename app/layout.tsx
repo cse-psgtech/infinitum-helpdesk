@@ -1,5 +1,7 @@
 import './globals.css'
 import { Metadata } from 'next'
+import { ScannerProvider } from '@/contexts/ScannerContext'
+import { Toaster } from 'react-hot-toast'
 
 export const metadata: Metadata = {
   title: 'Infinitum Helpdesk',
@@ -17,7 +19,10 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body>
-        {children}
+        <ScannerProvider>
+          <Toaster position="top-center" />
+          {children}
+        </ScannerProvider>
       </body>
     </html>
   )
