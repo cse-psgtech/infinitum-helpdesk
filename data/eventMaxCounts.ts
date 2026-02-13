@@ -1,5 +1,5 @@
 export const eventMaxCounts: Record<string, number> = {
-  EVNT01: 225,
+  EVNT01: 300,
   EVNT02: 200,
   EVNT03: 250,
   EVNT04: 150,
