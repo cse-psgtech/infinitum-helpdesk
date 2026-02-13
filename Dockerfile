@@ -47,18 +47,26 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
+# Copy custom server and socket files
+COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/contexts ./contexts
+
+# Copy node_modules for Socket.IO and other runtime dependencies
+COPY --from=builder /app/node_modules ./node_modules
+
 # Set file ownership
 RUN chown -R nextjs:nodejs /app
 
 # Switch to non-root user
 USER nextjs
 
-# Expose the port the app runs on
+# Expose the port the app runs on (4000 for HTTP and WebSocket)
 EXPOSE 4000
 
 # Set environment variables for runtime
 ENV PORT=4000
 ENV HOSTNAME="0.0.0.0"
 
-# Start the application
+# Start the custom server with Socket.IO
 CMD ["node", "server.js"]
